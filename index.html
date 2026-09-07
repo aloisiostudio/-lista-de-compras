@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Lista de Compras</title>
+<meta name="theme-color" content="#1F3D33">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Lista">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --chalk-green: #1F3D33;
+    --chalk-green-dark: #16291F;
+    --paper: #F7F5EF;
+    --paper-dim: #EFEDE4;
+    --ink: #22281F;
+    --ink-soft: #5B6459;
+    --butter: #E8B84B;
+    --butter-dark: #C9992F;
+    --tomato: #C64B3C;
+    --line: #DAD6C9;
+    --radius: 14px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
+  html,body{margin:0; padding:0;}
+  body{
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Work Sans', system-ui, sans-serif;
+    min-height: 100vh;
+    min-height: 100dvh;
+    display:flex;
+    justify-content:center;
+  }
+  #app{
+    width:100%;
+    max-width: 480px;
+    min-height: 100vh;
+    min-height: 100dvh;
+    background: var(--paper);
+    display:flex;
+    flex-direction:column;
+    position:relative;
+  }
+
+  header{
+    background: var(--chalk-green);
+    background-image:
+      radial-gradient(circle at 20% 20%, rgba(255,255,255,0.03) 0, transparent 40%),
+      radial-gradient(circle at 80% 60%, rgba(255,255,255,0.025) 0, transparent 45%);
+    padding: calc(28px + env(safe-area-inset-top)) 20px 22px;
+    border-bottom-left-radius: 22px;
+    border-bottom-right-radius: 22px;
+    box-shadow: 0 6px 18px rgba(22,41,31,0.25);
+  }
+  header h1{
+    font-family: 'Caveat', cursive;
+    font-weight:700;
+    color: var(--paper);
+    font-size: 2.6rem;
+    margin: 0 0 2px;
+    letter-spacing: 0.5px;
+  }
+  header p{
+    color: rgba(247,245,239,0.65);
+    font-size: 0.9rem;
+    margin: 0 0 18px;
+  }
+  .progress-row{ display:flex; align-items:center; gap:10px; }
+  .progress-track{ flex:1; height:8px; background: rgba(247,245,239,0.15); border-radius: 999px; overflow:hidden; }
+  .progress-fill{ height:100%; background: var(--butter); border-radius: 999px; transition: width 0.35s ease; width:0%; }
+  .progress-label{ color: var(--paper); font-size: 0.8rem; font-variant-numeric: tabular-nums; opacity:0.8; white-space:nowrap; }
+
+  .add-form{
+    margin: -16px 16px 0;
+    background: var(--paper);
+    border-radius: var(--radius);
+    box-shadow: 0 4px 14px rgba(22,41,31,0.12);
+    padding: 10px;
+    display:flex;
+    gap:8px;
+    position:relative;
+    z-index:2;
+  }
+  .add-form input[type="text"]{
+    flex:1; border:none; background: var(--paper-dim); border-radius: 10px;
+    padding: 12px 14px; font-family:'Work Sans', sans-serif; font-size: 1rem; color: var(--ink); min-width:0;
+  }
+  .add-form input[type="text"]:focus{ outline: 2px solid var(--butter); outline-offset: 1px; }
+  .add-form button{
+    background: var(--butter); border:none; color: var(--chalk-green-dark); font-weight:700;
+    font-size: 1.4rem; width: 46px; border-radius: 10px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; transition: transform 0.12s ease, background 0.12s ease;
+  }
+  .add-form button:active{ transform: scale(0.93); background: var(--butter-dark); }
+
+  .category-select{ margin: 10px 16px 0; display:flex; gap:8px; overflow-x:auto; padding-bottom:2px; scrollbar-width:none; }
+  .category-select::-webkit-scrollbar{display:none;}
+  .cat-chip{
+    flex:0 0 auto; padding:6px 13px; border-radius:999px; border:1px solid var(--line);
+    background: var(--paper); font-size:0.82rem; color: var(--ink-soft); cursor:pointer; white-space:nowrap; transition: all 0.15s ease;
+  }
+  .cat-chip.active{ background: var(--chalk-green); border-color: var(--chalk-green); color: var(--paper); }
+
+  main{ flex:1; padding: 18px 16px calc(100px + env(safe-area-inset-bottom)); overflow-y:auto; }
+  .section-title{
+    font-size:0.78rem; font-weight:600; color: var(--ink-soft); letter-spacing: 0.02em;
+    margin: 22px 4px 8px; display:flex; align-items:center; gap:8px;
+  }
+  .section-title:first-child{ margin-top:0; }
+  .section-title .dot{ width:8px; height:8px; border-radius:50%; background: var(--cat-color, var(--butter)); flex:0 0 auto; }
+  .section-title .count{ margin-left:auto; font-weight:400; opacity:0.7; }
+
+  ul.item-list{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px; }
+  .item{
+    display:flex; align-items:center; gap:12px; background: #fff; border:1px solid var(--line);
+    border-radius: 12px; padding: 11px 12px; transition: opacity 0.2s ease, background 0.2s ease;
+  }
+  .item.done{ background: var(--paper-dim); opacity:0.62; }
+  .checkbox{
+    flex:0 0 auto; width:24px; height:24px; border-radius:7px; border: 2px solid var(--chalk-green);
+    display:flex; align-items:center; justify-content:center; cursor:pointer; background:transparent;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+  .checkbox svg{ width:14px; height:14px; opacity:0; transition: opacity 0.15s ease; }
+  .item.done .checkbox{ background: var(--chalk-green); }
+  .item.done .checkbox svg{ opacity:1; }
+
+  .item-main{ flex:1; min-width:0; display:flex; flex-direction:column; }
+  .item-name{ font-size:0.98rem; color: var(--ink); word-break:break-word; }
+  .item.done .item-name{ text-decoration: line-through; text-decoration-color: var(--tomato); color: var(--ink-soft); }
+  .item-qty{ font-size:0.76rem; color: var(--ink-soft); margin-top:1px; }
+  .qty-controls{ display:flex; align-items:center; gap:6px; flex:0 0 auto; }
+  .qty-btn{
+    width:22px; height:22px; border-radius:6px; border:1px solid var(--line); background: var(--paper);
+    color: var(--ink-soft); font-size:0.95rem; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  }
+  .qty-num{ font-size:0.85rem; min-width:16px; text-align:center; color: var(--ink); }
+  .delete-btn{
+    flex:0 0 auto; width:28px; height:28px; border:none; background:transparent; color: var(--ink-soft);
+    cursor:pointer; border-radius:8px; display:flex; align-items:center; justify-content:center;
+  }
+  .delete-btn:active{ background: rgba(198,75,60,0.12); color: var(--tomato); }
+
+  .empty-state{ text-align:center; padding: 50px 20px; color: var(--ink-soft); }
+  .empty-state .chalk{ font-family:'Caveat', cursive; font-size:1.8rem; color: var(--chalk-green); display:block; margin-bottom:6px; }
+
+  .footer-bar{
+    position:absolute; bottom:0; left:0; right:0;
+    background: linear-gradient(to top, var(--paper) 70%, rgba(247,245,239,0));
+    padding: 18px 16px calc(16px + env(safe-area-inset-bottom));
+    display:flex; justify-content:center;
+  }
+  .clear-btn{ background:none; border:1px solid var(--line); color: var(--ink-soft); padding:9px 18px; border-radius:999px; font-size:0.85rem; cursor:pointer; }
+  .clear-btn:active{ background: var(--paper-dim); }
+
+  .toast{
+    position:fixed; bottom:22px; left:50%; transform: translateX(-50%) translateY(20px);
+    background: var(--chalk-green-dark); color: var(--paper); padding: 10px 18px; border-radius: 999px;
+    font-size: 0.85rem; opacity:0; pointer-events:none; transition: opacity 0.25s ease, transform 0.25s ease;
+    z-index: 10; max-width: 90%; text-align:center;
+  }
+  .toast.show{ opacity:1; transform: translateX(-50%) translateY(0); }
+
+  .install-banner{
+    margin: 12px 16px 0; background: var(--butter); color: var(--chalk-green-dark);
+    border-radius: 12px; padding: 12px 14px; display:none; align-items:center; gap:10px; font-size:0.85rem;
+  }
+  .install-banner.show{ display:flex; }
+  .install-banner button{
+    margin-left:auto; background: var(--chalk-green-dark); color: var(--paper); border:none;
+    padding:7px 12px; border-radius:8px; font-size:0.8rem; cursor:pointer; flex:0 0 auto;
+  }
+
+  @media (prefers-reduced-motion: reduce){ *{ transition: none !important; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>Lista de compras</h1>
+    <p id="subtitle">Toque em + para adicionar</p>
+    <div class="progress-row">
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="progress-label" id="progressLabel">0/0</div>
+    </div>
+  </header>
+
+  <div class="install-banner" id="installBanner">
+    <span>Instalar na tela inicial?</span>
+    <button id="installBtn">Instalar</button>
+  </div>
+
+  <form class="add-form" id="addForm">
+    <input type="text" id="itemInput" placeholder="Adicionar item..." autocomplete="off" maxlength="60">
+    <button type="submit" aria-label="Adicionar">+</button>
+  </form>
+
+  <div class="category-select" id="categorySelect"></div>
+
+  <main id="mainList"></main>
+
+  <div class="footer-bar">
+    <button class="clear-btn" id="clearBtn">Limpar concluídos</button>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+(function(){
+  const CATEGORIES = [
+    { id: 'hortifruti', label: 'Hortifruti', color: '#5C8A5A' },
+    { id: 'acougue', label: 'Açougue', color: '#B5544A' },
+    { id: 'laticinios', label: 'Laticínios', color: '#D6B24C' },
+    { id: 'padaria', label: 'Padaria', color: '#C08A4E' },
+    { id: 'mercearia', label: 'Mercearia', color: '#7B8FA1' },
+    { id: 'bebidas', label: 'Bebidas', color: '#5A8FA8' },
+    { id: 'limpeza', label: 'Limpeza', color: '#6FA8A0' },
+    { id: 'higiene', label: 'Higiene', color: '#9878A8' },
+    { id: 'outros', label: 'Outros', color: '#8B8B7A' },
+  ];
+
+  const KEYWORD_MAP = {
+    hortifruti: ['banana','maçã','maca','laranja','alface','tomate','cebola','batata','cenoura','limão','limao','uva','abacate','abacaxi','mamão','mamao','pepino','pimentão','pimentao','morango','manga','melancia','brócolis','brocolis','couve','alho'],
+    acougue: ['frango','carne','peixe','bacon','linguiça','linguica','picanha','costela','file','filé','peito','coxa','asa','camarão','camarao'],
+    laticinios: ['leite','queijo','iogurte','manteiga','requeijão','requeijao','nata','creme de leite'],
+    padaria: ['pão','pao','baguete','croissant','bolo','biscoito','torrada'],
+    mercearia: ['arroz','feijão','feijao','macarrão','macarrao','massa','óleo','oleo','açúcar','acucar','sal','farinha','molho','café','cafe','achocolatado','tempero','extrato de tomate'],
+    bebidas: ['água','agua','suco','refrigerante','cerveja','vinho','vodka','energético','energetico'],
+    limpeza: ['detergente','sabão','sabao','desinfetante','água sanitária','agua sanitaria','esponja','papel toalha','amaciante'],
+    higiene: ['papel higiênico','papel higienico','shampoo','sabonete','pasta de dente','creme dental','absorvente','desodorante'],
+  };
+
+  function guessCategory(name){
+    const lower = name.toLowerCase();
+    for(const [cat, words] of Object.entries(KEYWORD_MAP)){
+      if(words.some(w => lower.includes(w))) return cat;
+    }
+    return 'outros';
+  }
+
+  const STORAGE_KEY = 'shopping-list-items';
+  let items = [];
+  let activeFilter = 'todas';
+
+  const els = {
+    form: document.getElementById('addForm'),
+    input: document.getElementById('itemInput'),
+    catSelect: document.getElementById('categorySelect'),
+    main: document.getElementById('mainList'),
+    progressFill: document.getElementById('progressFill'),
+    progressLabel: document.getElementById('progressLabel'),
+    subtitle: document.getElementById('subtitle'),
+    clearBtn: document.getElementById('clearBtn'),
+    toast: document.getElementById('toast'),
+    installBanner: document.getElementById('installBanner'),
+    installBtn: document.getElementById('installBtn'),
+  };
+
+  function showToast(msg){
+    els.toast.textContent = msg;
+    els.toast.classList.add('show');
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(()=> els.toast.classList.remove('show'), 1800);
+  }
+
+  function loadItems(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      items = raw ? JSON.parse(raw) : [];
+    }catch(e){
+      items = [];
+    }
+    render();
+  }
+
+  function saveItems(){
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    }catch(e){
+      showToast('Não foi possível salvar agora');
+    }
+  }
+
+  function addItem(name){
+    const trimmed = name.trim();
+    if(!trimmed) return;
+    items.push({
+      id: 'i' + Date.now() + Math.random().toString(16).slice(2),
+      name: trimmed,
+      qty: 1,
+      done: false,
+      category: guessCategory(trimmed),
+    });
+    saveItems();
+    render();
+  }
+
+  function toggleDone(id){
+    const it = items.find(i => i.id === id);
+    if(it) it.done = !it.done;
+    saveItems();
+    render();
+  }
+
+  function changeQty(id, delta){
+    const it = items.find(i => i.id === id);
+    if(it){ it.qty = Math.max(1, Math.min(99, it.qty + delta)); }
+    saveItems();
+    render();
+  }
+
+  function removeItem(id){
+    items = items.filter(i => i.id !== id);
+    saveItems();
+    render();
+  }
+
+  function clearDone(){
+    const hadDone = items.some(i => i.done);
+    if(!hadDone){ showToast('Nada concluído para limpar'); return; }
+    items = items.filter(i => !i.done);
+    saveItems();
+    render();
+    showToast('Itens concluídos removidos');
+  }
+
+  function checkIcon(){
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="#F7F5EF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 13 10 18 19 7"></polyline></svg>';
+  }
+
+  function renderCategoryChips(){
+    const counts = {};
+    items.forEach(i => { if(!i.done) counts[i.category] = (counts[i.category]||0) + 1; });
+    const usedCats = CATEGORIES.filter(c => counts[c.id]);
+    let html = `<div class="cat-chip ${activeFilter==='todas'?'active':''}" data-cat="todas">Todas</div>`;
+    usedCats.forEach(c => {
+      html += `<div class="cat-chip ${activeFilter===c.id?'active':''}" data-cat="${c.id}">${c.label}</div>`;
+    });
+    els.catSelect.innerHTML = html;
+    els.catSelect.querySelectorAll('.cat-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        activeFilter = chip.dataset.cat;
+        render();
+      });
+    });
+  }
+
+  function render(){
+    const total = items.length;
+    const done = items.filter(i => i.done).length;
+    els.progressFill.style.width = total ? `${(done/total)*100}%` : '0%';
+    els.progressLabel.textContent = `${done}/${total}`;
+    els.subtitle.textContent = total === 0
+      ? 'Toque em + para adicionar'
+      : (done === total ? 'Tudo pronto! 🎉' : `Faltam ${total - done} ${total-done===1?'item':'itens'}`);
+
+    renderCategoryChips();
+
+    if(total === 0){
+      els.main.innerHTML = `<div class="empty-state"><span class="chalk">Lista vazia</span>Adicione o primeiro item acima</div>`;
+      return;
+    }
+
+    const visible = activeFilter === 'todas' ? items : items.filter(i => i.category === activeFilter || (i.done));
+    const pending = visible.filter(i => !i.done);
+    const doneItems = visible.filter(i => i.done);
+
+    let html = '';
+
+    if(pending.length){
+      const byCat = {};
+      pending.forEach(i => { (byCat[i.category] = byCat[i.category] || []).push(i); });
+      const orderedCats = CATEGORIES.filter(c => byCat[c.id]);
+      orderedCats.forEach(cat => {
+        html += `<div class="section-title" style="--cat-color:${cat.color}"><span class="dot"></span>${cat.label}<span class="count">${byCat[cat.id].length}</span></div>`;
+        html += `<ul class="item-list">` + byCat[cat.id].map(renderItem).join('') + `</ul>`;
+      });
+    }
+
+    if(doneItems.length){
+      html += `<div class="section-title"><span class="dot" style="--cat-color:#B7B2A0"></span>Concluídos<span class="count">${doneItems.length}</span></div>`;
+      html += `<ul class="item-list">` + doneItems.map(renderItem).join('') + `</ul>`;
+    }
+
+    if(!pending.length && !doneItems.length){
+      html = `<div class="empty-state"><span class="chalk">Nada por aqui</span>Nenhum item nessa categoria</div>`;
+    }
+
+    els.main.innerHTML = html;
+
+    els.main.querySelectorAll('[data-action="toggle"]').forEach(el => el.addEventListener('click', () => toggleDone(el.dataset.id)));
+    els.main.querySelectorAll('[data-action="inc"]').forEach(el => el.addEventListener('click', () => changeQty(el.dataset.id, 1)));
+    els.main.querySelectorAll('[data-action="dec"]').forEach(el => el.addEventListener('click', () => changeQty(el.dataset.id, -1)));
+    els.main.querySelectorAll('[data-action="delete"]').forEach(el => el.addEventListener('click', () => removeItem(el.dataset.id)));
+  }
+
+  function renderItem(it){
+    return `
+      <li class="item ${it.done ? 'done' : ''}">
+        <div class="checkbox" data-action="toggle" data-id="${it.id}">${checkIcon()}</div>
+        <div class="item-main">
+          <div class="item-name">${escapeHtml(it.name)}</div>
+          ${it.qty > 1 ? `<div class="item-qty">Qtd: ${it.qty}</div>` : ''}
+        </div>
+        <div class="qty-controls">
+          <button class="qty-btn" data-action="dec" data-id="${it.id}">−</button>
+          <span class="qty-num">${it.qty}</span>
+          <button class="qty-btn" data-action="inc" data-id="${it.id}">+</button>
+        </div>
+        <button class="delete-btn" data-action="delete" data-id="${it.id}" aria-label="Remover">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </li>`;
+  }
+
+  function escapeHtml(str){
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  els.form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    addItem(els.input.value);
+    els.input.value = '';
+    els.input.focus();
+  });
+
+  els.clearBtn.addEventListener('click', clearDone);
+
+  loadItems();
+
+  // ---- PWA install prompt ----
+  let deferredPrompt = null;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    els.installBanner.classList.add('show');
+  });
+  els.installBtn.addEventListener('click', async () => {
+    if(!deferredPrompt) return;
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    els.installBanner.classList.remove('show');
+  });
+  window.addEventListener('appinstalled', () => {
+    els.installBanner.classList.remove('show');
+  });
+
+  // ---- Service worker registration (enables full offline use) ----
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('service-worker.js').catch(() => {});
+    });
+  }
+})();
+</script>
+</body>
+</html>
