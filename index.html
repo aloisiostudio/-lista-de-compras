@@ -163,8 +163,13 @@
   .item.done .checkbox svg{ opacity:1; }
 
   .item-main{ flex:1; min-width:0; display:flex; flex-direction:column; }
-  .item-name{ font-size:0.98rem; color: var(--ink); word-break:break-word; }
+  .item-name{ font-size:0.98rem; color: var(--ink); word-break:break-word; cursor:text; border-bottom:1px dashed transparent; display:inline-block; }
+  .item:not(.done) .item-name:active{ border-bottom-color: var(--line); }
   .item.done .item-name{ text-decoration: line-through; text-decoration-color: var(--tomato); color: var(--ink-soft); }
+  .item-name-input{
+    font-size:0.98rem; padding:2px 4px; border:1px solid var(--line); border-radius:6px;
+    background: var(--card-bg); color: var(--ink); width:100%;
+  }
   .item-qty{ font-size:0.76rem; color: var(--ink-soft); margin-top:1px; }
   .qty-controls{ display:flex; align-items:center; gap:6px; flex:0 0 auto; }
   .qty-btn{
@@ -205,6 +210,15 @@
   }
   .toast.show{ opacity:1; transform: translateX(-50%) translateY(0); }
 
+  .undo-toast{
+    display:flex; align-items:center; gap:12px; padding:8px 8px 8px 18px; pointer-events:none;
+  }
+  .undo-toast.show{ pointer-events:auto; }
+  .undo-toast button{
+    background: var(--butter); color: var(--chalk-green-dark); border:none; padding:7px 14px;
+    border-radius:999px; font-size:0.8rem; font-weight:600; cursor:pointer; flex:0 0 auto; white-space:nowrap;
+  }
+
   .install-banner{
     margin: 12px 16px 0; background: var(--butter); color: var(--chalk-green-dark);
     border-radius: 12px; padding: 12px 14px; display:none; align-items:center; gap:10px; font-size:0.85rem;
@@ -228,7 +242,7 @@
     background: var(--card-bg); width:100%; max-width:480px;
     border-top-left-radius:20px; border-top-right-radius:20px;
     padding: 18px 16px calc(20px + env(safe-area-inset-bottom));
-    max-height:72vh; display:flex; flex-direction:column;
+    max-height:78vh; display:flex; flex-direction:column;
   }
   .list-panel-header{ font-weight:600; font-size:1rem; margin-bottom:12px; color:var(--ink); }
   .list-panel-items{ overflow-y:auto; display:flex; flex-direction:column; gap:6px; margin-bottom:14px; }
@@ -248,7 +262,7 @@
     font-size:0.95rem; padding:4px 6px; border-radius:6px; border:1px solid var(--line);
     background: var(--card-bg); color: var(--ink); width:100%;
   }
-  .new-list-form{ display:flex; gap:8px; }
+  .new-list-form{ display:flex; gap:8px; margin-bottom:10px; }
   .new-list-form input{
     flex:1; border:1px solid var(--line); background:var(--paper-dim); border-radius:10px;
     padding:10px 12px; font-size:0.9rem; color:var(--ink);
@@ -256,6 +270,14 @@
   .new-list-form button{
     background: var(--chalk-green); color:#F7F5EF; border:none; padding:0 16px; border-radius:10px; cursor:pointer; font-size:0.9rem;
   }
+  .backup-row{ display:flex; gap:8px; border-top:1px solid var(--line); padding-top:12px; }
+  .backup-btn{
+    flex:1; display:flex; align-items:center; justify-content:center; gap:6px;
+    background: var(--paper-dim); border:1px solid var(--line); color: var(--ink-soft);
+    padding:9px 10px; border-radius:10px; font-size:0.8rem; cursor:pointer;
+  }
+  .backup-btn svg{ width:14px; height:14px; }
+  .backup-btn:active{ background: var(--line); }
 
   @media (prefers-reduced-motion: reduce){
     *{ transition: none !important; }
@@ -312,6 +334,10 @@
   </div>
 
   <div class="toast" id="toast"></div>
+  <div class="toast undo-toast" id="undoToast">
+    <span id="undoToastMsg"></span>
+    <button id="undoToastBtn">Desfazer</button>
+  </div>
   <div id="confettiLayer"></div>
 
   <div class="list-panel-overlay" id="listPanelOverlay">
@@ -322,6 +348,17 @@
         <input type="text" id="newListInput" placeholder="Nome da nova lista" maxlength="30">
         <button type="submit">Criar</button>
       </form>
+      <div class="backup-row">
+        <button type="button" class="backup-btn" id="exportBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          Exportar backup
+        </button>
+        <button type="button" class="backup-btn" id="importBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+          Importar backup
+        </button>
+        <input type="file" id="importFileInput" accept="application/json" style="display:none">
+      </div>
     </div>
   </div>
 </div>
@@ -368,6 +405,8 @@
   let history = [];
   let activeFilter = 'todas';
   let celebrated = false;
+  let pendingUndo = null;
+  let undoTimeout = null;
 
   function uid(prefix){ return prefix + Date.now() + Math.random().toString(16).slice(2); }
 
@@ -384,6 +423,9 @@
     clearBtn: document.getElementById('clearBtn'),
     shareBtn: document.getElementById('shareBtn'),
     toast: document.getElementById('toast'),
+    undoToast: document.getElementById('undoToast'),
+    undoToastMsg: document.getElementById('undoToastMsg'),
+    undoToastBtn: document.getElementById('undoToastBtn'),
     installBanner: document.getElementById('installBanner'),
     installBtn: document.getElementById('installBtn'),
     themeBtn: document.getElementById('themeBtn'),
@@ -395,6 +437,9 @@
     listPanelItems: document.getElementById('listPanelItems'),
     newListForm: document.getElementById('newListForm'),
     newListInput: document.getElementById('newListInput'),
+    exportBtn: document.getElementById('exportBtn'),
+    importBtn: document.getElementById('importBtn'),
+    importFileInput: document.getElementById('importFileInput'),
   };
 
   // ---- Theme ----
@@ -536,6 +581,38 @@
     }
   }
 
+  // ---- Undo ----
+  function queueUndo(listId, entries, message){
+    pendingUndo = { listId, entries };
+    els.undoToastMsg.textContent = message;
+    els.undoToast.classList.add('show');
+    clearTimeout(undoTimeout);
+    undoTimeout = setTimeout(() => {
+      els.undoToast.classList.remove('show');
+      pendingUndo = null;
+    }, 5000);
+  }
+  function performUndo(){
+    if(!pendingUndo) return;
+    const list = appData.lists.find(l => l.id === pendingUndo.listId);
+    if(list){
+      const sorted = [...pendingUndo.entries].sort((a,b) => a.index - b.index);
+      sorted.forEach(entry => {
+        const insertAt = Math.min(entry.index, list.items.length);
+        list.items.splice(insertAt, 0, entry.item);
+      });
+      if(appData.activeListId !== list.id){ appData.activeListId = list.id; activeFilter = 'todas'; }
+      celebrated = false;
+      saveData();
+      render();
+      showToast('Restaurado');
+    }
+    pendingUndo = null;
+    clearTimeout(undoTimeout);
+    els.undoToast.classList.remove('show');
+  }
+  els.undoToastBtn.addEventListener('click', performUndo);
+
   // ---- Items (operate on active list) ----
   function addItem(name){
     const trimmed = name.trim();
@@ -544,6 +621,14 @@
     list.items.push({ id: uid('i'), name: trimmed, qty: 1, done: false, category: guessCategory(trimmed) });
     pushHistory(trimmed);
     celebrated = false;
+    saveData();
+    render();
+  }
+  function renameItem(id, newName){
+    const trimmed = (newName || '').trim();
+    if(!trimmed){ render(); return; }
+    const it = I().find(i => i.id === id);
+    if(it){ it.name = trimmed; it.category = guessCategory(trimmed); pushHistory(trimmed); }
     saveData();
     render();
   }
@@ -559,21 +644,25 @@
     saveData();
     render();
   }
-  function removeItem(id){
+  function deleteItem(id){
     const list = getActiveList();
-    list.items = list.items.filter(i => i.id !== id);
+    const idx = list.items.findIndex(i => i.id === id);
+    if(idx === -1) return;
+    const [removed] = list.items.splice(idx, 1);
     saveData();
     render();
+    queueUndo(list.id, [{ item: removed, index: idx }], `"${removed.name}" removido`);
   }
   function clearDone(){
-    const hadDone = I().some(i => i.done);
-    if(!hadDone){ showToast('Nada concluído para limpar'); return; }
     const list = getActiveList();
+    const removedEntries = [];
+    list.items.forEach((i, idx) => { if(i.done) removedEntries.push({ item: i, index: idx }); });
+    if(!removedEntries.length){ showToast('Nada concluído para limpar'); return; }
     list.items = list.items.filter(i => !i.done);
     celebrated = false;
     saveData();
     render();
-    showToast('Itens concluídos removidos');
+    queueUndo(list.id, removedEntries, `${removedEntries.length} ${removedEntries.length===1?'item removido':'itens removidos'}`);
   }
 
   // ---- Share ----
@@ -606,6 +695,56 @@
     catch(e){ showToast('Não foi possível compartilhar'); }
   }
   els.shareBtn.addEventListener('click', shareList);
+
+  // ---- Backup / restore ----
+  function exportBackup(){
+    const payload = { version: 1, exportedAt: new Date().toISOString(), appData, history };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const stamp = new Date().toISOString().slice(0,10);
+    a.href = url;
+    a.download = `lista-de-compras-backup-${stamp}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    showToast('Backup exportado');
+  }
+  function importBackup(file){
+    const reader = new FileReader();
+    reader.onload = () => {
+      try{
+        const parsed = JSON.parse(reader.result);
+        if(!parsed.appData || !Array.isArray(parsed.appData.lists) || !parsed.appData.lists.length){
+          showToast('Arquivo de backup inválido');
+          return;
+        }
+        const ok = confirm('Isso vai substituir todas as suas listas atuais pelo conteúdo do backup. Continuar?');
+        if(!ok) return;
+        appData = parsed.appData;
+        if(Array.isArray(parsed.history)) history = parsed.history;
+        if(!appData.lists.find(l => l.id === appData.activeListId)) appData.activeListId = appData.lists[0].id;
+        activeFilter = 'todas';
+        celebrated = false;
+        saveData();
+        saveHistory();
+        render();
+        closeListPanel();
+        showToast('Backup restaurado com sucesso');
+      }catch(err){
+        showToast('Não foi possível ler o arquivo');
+      }
+    };
+    reader.readAsText(file);
+  }
+  els.exportBtn.addEventListener('click', exportBackup);
+  els.importBtn.addEventListener('click', () => els.importFileInput.click());
+  els.importFileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if(file) importBackup(file);
+    els.importFileInput.value = '';
+  });
 
   // ---- Suggestions ----
   function renderSuggestions(){
@@ -714,7 +853,25 @@
     els.main.querySelectorAll('[data-action="toggle"]').forEach(el => el.addEventListener('click', () => toggleDone(el.dataset.id)));
     els.main.querySelectorAll('[data-action="inc"]').forEach(el => el.addEventListener('click', () => changeQty(el.dataset.id, 1)));
     els.main.querySelectorAll('[data-action="dec"]').forEach(el => el.addEventListener('click', () => changeQty(el.dataset.id, -1)));
-    els.main.querySelectorAll('[data-action="delete"]').forEach(el => el.addEventListener('click', () => removeItem(el.dataset.id)));
+    els.main.querySelectorAll('[data-action="delete"]').forEach(el => el.addEventListener('click', () => deleteItem(el.dataset.id)));
+    els.main.querySelectorAll('[data-action="edit-name"]').forEach(el => el.addEventListener('click', () => startEditItemName(el.dataset.id)));
+  }
+
+  function startEditItemName(id){
+    const nameEl = els.main.querySelector(`.item-name[data-id="${id}"]`);
+    if(!nameEl) return;
+    const it = I().find(i => i.id === id);
+    if(!it) return;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = it.name;
+    input.className = 'item-name-input';
+    input.maxLength = 60;
+    nameEl.replaceWith(input);
+    input.focus();
+    input.select();
+    input.addEventListener('keydown', (e) => { if(e.key === 'Enter'){ input.blur(); } });
+    input.addEventListener('blur', () => renameItem(id, input.value), { once: true });
   }
 
   function renderItem(it){
@@ -722,7 +879,7 @@
       <li class="item ${it.done ? 'done' : ''}">
         <div class="checkbox" data-action="toggle" data-id="${it.id}">${checkIcon()}</div>
         <div class="item-main">
-          <div class="item-name">${escapeHtml(it.name)}</div>
+          <div class="item-name" data-action="edit-name" data-id="${it.id}">${escapeHtml(it.name)}</div>
           ${it.qty > 1 ? `<div class="item-qty">Qtd: ${it.qty}</div>` : ''}
         </div>
         <div class="qty-controls">
